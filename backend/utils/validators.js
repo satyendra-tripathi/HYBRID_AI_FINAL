@@ -275,80 +275,53 @@
 //   validateQuery,
 // };
 
-
 import Joi from "joi";
 
-/**
- * =========================
- * REGISTER SCHEMA (FIXED)
- * =========================
- */
+/* =========================
+   Auth Schemas
+========================= */
+
 export const registerSchema = Joi.object({
-  name: Joi.string()
-    .trim()
-    .min(2)
-    .max(50)
-    .required()
-    .messages({
-      "string.empty": "Name is required",
-      "string.min": "Name must be at least 2 characters",
-      "string.max": "Name must not exceed 50 characters",
-    }),
+  name: Joi.string().trim().min(2).max(50).required().messages({
+    "string.empty": "Name is required",
+    "string.min": "Name must be at least 2 characters",
+    "string.max": "Name must not exceed 50 characters",
+  }),
 
-  email: Joi.string()
-    .trim()
-    .lowercase()
-    .email()
-    .required()
-    .messages({
-      "string.email": "Invalid email format",
-      "string.empty": "Email is required",
-    }),
+  email: Joi.string().trim().lowercase().email().required().messages({
+    "string.email": "Invalid email format",
+    "string.empty": "Email is required",
+  }),
 
-  password: Joi.string()
-    .min(8)
-    .max(128)
-    .required()
-    .messages({
-      "string.min": "Password must be at least 8 characters",
-      "string.max": "Password must not exceed 128 characters",
-      "string.empty": "Password is required",
-    }),
+  password: Joi.string().min(8).max(128).required().messages({
+    "string.min": "Password must be at least 8 characters",
+    "string.max": "Password must not exceed 128 characters",
+    "string.empty": "Password is required",
+  }),
+
+  confirmPassword: Joi.string().valid(Joi.ref("password")).optional().messages({
+    "any.only": "Passwords do not match",
+  }),
 });
 
-/**
- * =========================
- * LOGIN SCHEMA
- * =========================
- */
 export const loginSchema = Joi.object({
-  email: Joi.string()
-    .email()
-    .lowercase()
-    .required()
-    .messages({
-      "string.email": "Invalid email format",
-      "string.empty": "Email is required",
-    }),
+  email: Joi.string().trim().lowercase().email().required().messages({
+    "string.email": "Invalid email format",
+    "string.empty": "Email is required",
+  }),
 
-  password: Joi.string()
-    .required()
-    .messages({
-      "string.empty": "Password is required",
-    }),
+  password: Joi.string().required().messages({
+    "string.empty": "Password is required",
+  }),
 });
 
-/**
- * =========================
- * UPDATE PROFILE
- * =========================
- */
 export const updateProfileSchema = Joi.object({
-  name: Joi.string().min(2).max(50).optional(),
+  name: Joi.string().trim().min(2).max(50).optional(),
 
   currentPassword: Joi.string().when("newPassword", {
     is: Joi.exist(),
     then: Joi.required(),
+    otherwise: Joi.optional(),
   }),
 
   newPassword: Joi.string().min(8).max(128).optional(),
@@ -358,29 +331,92 @@ export const updateProfileSchema = Joi.object({
     .when("newPassword", {
       is: Joi.exist(),
       then: Joi.required(),
+      otherwise: Joi.optional(),
     })
     .messages({
       "any.only": "Passwords do not match",
     }),
 });
 
-/**
- * =========================
- * VALIDATE MIDDLEWARE
- * =========================
- */
+/* =========================
+   Analyze Schemas
+========================= */
+
+export const trafficAnalysisSchema = Joi.object({
+  protocol: Joi.string()
+    .trim()
+    .uppercase()
+    .valid("TCP", "UDP", "ICMP", "HTTP", "HTTPS", "DNS", "FTP", "SSH")
+    .default("TCP"),
+
+  src_ip: Joi.string().trim().optional().allow(""),
+  dst_ip: Joi.string().trim().optional().allow(""),
+
+  sourceIP: Joi.string().trim().optional().allow(""),
+  destinationIP: Joi.string().trim().optional().allow(""),
+
+  src_port: Joi.number().integer().min(0).max(65535).optional(),
+  dst_port: Joi.number().integer().min(0).max(65535).optional(),
+
+  sourcePort: Joi.number().integer().min(0).max(65535).optional(),
+  destinationPort: Joi.number().integer().min(0).max(65535).optional(),
+
+  duration: Joi.number().min(0).optional().default(0),
+
+  bytes_sent: Joi.number().min(0).optional().default(0),
+  bytes_received: Joi.number().min(0).optional().default(0),
+
+  bytes: Joi.number().min(0).optional(),
+  packets: Joi.number().min(0).optional(),
+  packetSize: Joi.number().min(0).optional(),
+
+  flags: Joi.alternatives().try(Joi.number(), Joi.string()).optional(),
+}).unknown(true);
+
+export const batchAnalysisSchema = Joi.object({
+  trafficData: Joi.array().items(trafficAnalysisSchema).min(1).required(),
+}).unknown(true);
+
+/* =========================
+   Logs Query Schema
+========================= */
+
+export const searchLogsSchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+
+  limit: Joi.number().integer().min(1).max(100).default(20),
+
+  attackType: Joi.string()
+    .valid("All", "Normal", "DDoS", "Port Scan", "Brute Force", "Malware")
+    .default("All")
+    .optional(),
+
+  severity: Joi.string()
+    .valid("All", "Low", "Medium", "High", "Critical")
+    .default("All")
+    .optional(),
+
+  dateFrom: Joi.date().optional(),
+  dateTo: Joi.date().optional(),
+}).unknown(true);
+
+/* =========================
+   Validation Middlewares
+========================= */
+
 export const validate = (schema) => {
   return async (req, res, next) => {
     try {
       const value = await schema.validateAsync(req.body, {
         abortEarly: false,
         stripUnknown: true,
+        convert: true,
       });
 
       req.validatedData = value;
       next();
     } catch (error) {
-      const messages = error.details
+      const errors = error.details
         ? error.details.map((detail) => ({
             field: detail.path.join("."),
             message: detail.message,
@@ -390,7 +426,35 @@ export const validate = (schema) => {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: messages,
+        errors,
+      });
+    }
+  };
+};
+
+export const validateQuery = (schema) => {
+  return async (req, res, next) => {
+    try {
+      const value = await schema.validateAsync(req.query, {
+        abortEarly: false,
+        stripUnknown: true,
+        convert: true,
+      });
+
+      req.validatedQuery = value;
+      next();
+    } catch (error) {
+      const errors = error.details
+        ? error.details.map((detail) => ({
+            field: detail.path.join("."),
+            message: detail.message,
+          }))
+        : [{ field: "unknown", message: error.message }];
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors,
       });
     }
   };
@@ -400,5 +464,9 @@ export default {
   registerSchema,
   loginSchema,
   updateProfileSchema,
+  trafficAnalysisSchema,
+  batchAnalysisSchema,
+  searchLogsSchema,
   validate,
+  validateQuery,
 };

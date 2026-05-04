@@ -1,31 +1,37 @@
-import express from 'express';
-import * as analyzeController from '../controllers/analyzeController.js';
-import { authenticate } from '../middleware/auth.js';
-import { checkApiKey } from '../middleware/apiKeyMiddleware.js';
-import { validate } from '../utils/validators.js';
-import { trafficAnalysisSchema } from '../utils/validators.js';
-import { createRateLimiter } from '../config/security.js';
+import express from "express";
+
+import * as analyzeController from "../controllers/analyzeController.js";
+import { authenticate } from "../middleware/auth.js";
+import { checkApiKey } from "../middleware/apiKeyMiddleware.js";
+import {
+  validate,
+  trafficAnalysisSchema,
+  batchAnalysisSchema,
+} from "../utils/validators.js";
+import { createRateLimiter } from "../config/security.js";
 
 const router = express.Router();
 
-// Apply rate limiting to analysis endpoints
-const analysisLimiter = createRateLimiter(60000, 50); // 50 requests per minute
+const analysisLimiter = createRateLimiter(60 * 1000, 50);
 
-/**
- * Protected routes (authentication required)
- */
-
-// Custom middleware to allow either JWT or API Key
+/* =========================
+   Auth helper: JWT or API Key
+========================= */
 const requireAuthOrApiKey = (req, res, next) => {
-  if (req.headers['x-api-key']) {
+  if (req.headers["x-api-key"]) {
     return checkApiKey(req, res, next);
   }
+
   return authenticate(req, res, next);
 };
 
+/* =========================
+   Analyze Routes
+========================= */
+
 // Analyze single traffic packet
 router.post(
-  '/',
+  "/",
   requireAuthOrApiKey,
   analysisLimiter,
   validate(trafficAnalysisSchema),
@@ -34,29 +40,30 @@ router.post(
 
 // Batch analysis
 router.post(
-  '/batch',
+  "/batch",
   requireAuthOrApiKey,
   analysisLimiter,
+  validate(batchAnalysisSchema),
   analyzeController.analyzeTrafficBatch
 );
 
-// Tab title synchronization (from browser extension)
+// Tab title synchronization from browser extension
 router.post(
-  '/tab',
+  "/tab",
   analysisLimiter,
   analyzeController.tabSync
 );
 
 // Get statistics
 router.get(
-  '/statistics',
+  "/statistics",
   authenticate,
   analyzeController.getStatistics
 );
 
 // Get severity timeline
 router.get(
-  '/severity-timeline',
+  "/severity-timeline",
   authenticate,
   analyzeController.getSeverityTimeline
 );
