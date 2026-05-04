@@ -42,7 +42,7 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=optional=false
 
 COPY . .
 RUN npm run build
