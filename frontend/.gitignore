@@ -11,6 +11,10 @@ yarn.lock
 *.env
 backend/.env
 frontend/.env
+.env.example
+.env
+.env.*
+
 
 # Build
 dist/
