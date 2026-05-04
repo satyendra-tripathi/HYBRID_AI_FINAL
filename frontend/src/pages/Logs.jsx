@@ -4,7 +4,7 @@ import { FiSearch, FiDownload, FiFilter, FiSlash, FiShield, FiCpu, FiCheckCircle
 import { logsAPI } from '../utils/api.js';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.REACT_APP_API_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
 
 export const Logs = () => {
   const [logs, setLogs] = useState([]);
