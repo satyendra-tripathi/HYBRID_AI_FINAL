@@ -223,10 +223,7 @@ import { Server } from "socket.io";
 import morgan from "morgan";
 
 import connectDB from "./config/database.js";
-import {
-  helmetConfig,
-  createRateLimiter,
-} from "./config/security.js";
+import { helmetConfig, createRateLimiter } from "./config/security.js";
 
 import {
   notFoundHandler,
@@ -246,28 +243,46 @@ import tabRoutes from "./routes/tabRoutes.js";
 const app = express();
 const httpServer = createServer(app);
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:3000",
+const PORT = process.env.PORT || 5000;
+
+const envOrigins = [
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
+  process.env.CORS_ORIGINS,
+]
+  .filter(Boolean)
+  .flatMap((origin) => origin.split(","))
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
   "https://hybrid-ai-final-4.onrender.com",
-  "https://hybrid-ai-final-2.onrender.com",
-  "https://hybrid-ai-final-1.onrender.com",
-].filter(Boolean);
+  ...envOrigins,
+];
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  return allowedOrigins.includes(origin);
+};
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
 
+    logger.warn(`❌ CORS blocked origin: ${origin}`);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
 };
 
 const io = new Server(httpServer, {
@@ -276,41 +291,26 @@ const io = new Server(httpServer, {
 
 app.set("io", io);
 
+/* =========================
+   Security + CORS
+========================= */
 app.use(helmetConfig);
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 
+/*
+  Express 5 me app.options("*") kabhi-kabhi crash karta hai.
+  app.use(cors()) already OPTIONS/preflight handle kar deta hai.
+*/
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+/* =========================
+   Health / Root
+========================= */
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "AI-IDS API is running 🚀",
-  });
-});
-
-app.use(
-  morgan("combined", {
-    skip: (req) => req.path === "/health",
-  })
-);
-
-app.use(logHttpRequest);
-
-const limiter = createRateLimiter(15 * 60 * 1000, 100);
-app.use(limiter);
-
-io.on("connection", (socket) => {
-  logger.info(`🔌 Client connected: ${socket.id}`);
-
-  socket.on("join", (room) => {
-    socket.join(room);
-    logger.info(`👤 Client ${socket.id} joined room: ${room}`);
-  });
-
-  socket.on("disconnect", () => {
-    logger.info(`🔌 Client disconnected: ${socket.id}`);
   });
 });
 
@@ -322,16 +322,50 @@ app.get(
         ? await connectDB.checkDBHealth()
         : { status: "unknown" };
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Server is healthy",
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
+      environment: process.env.NODE_ENV || "development",
       database: db,
     });
   })
 );
 
+/* =========================
+   Logging + Rate Limit
+========================= */
+app.use(
+  morgan("combined", {
+    skip: (req) => req.path === "/health",
+  })
+);
+
+app.use(logHttpRequest);
+
+const limiter = createRateLimiter(15 * 60 * 1000, 100);
+app.use(limiter);
+
+/* =========================
+   Socket.IO
+========================= */
+io.on("connection", (socket) => {
+  logger.info(`🔌 Client connected: ${socket.id}`);
+
+  socket.on("join", (room) => {
+    if (!room) return;
+    socket.join(room);
+    logger.info(`👤 Client ${socket.id} joined room: ${room}`);
+  });
+
+  socket.on("disconnect", () => {
+    logger.info(`🔌 Client disconnected: ${socket.id}`);
+  });
+});
+
+/* =========================
+   API Info
+========================= */
 app.get("/api/info", (req, res) => {
   res.status(200).json({
     success: true,
@@ -343,52 +377,57 @@ app.get("/api/info", (req, res) => {
       analyze: "/api/analyze",
       logs: "/api/logs",
       metrics: "/api/metrics",
+      tab: "/api/tab",
     },
   });
 });
 
+/* =========================
+   Routes
+========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/analyze", analyzeRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/metrics", metricsRoutes);
 app.use("/api/tab", tabRoutes);
 
+/* =========================
+   Error Handlers
+========================= */
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-
+/* =========================
+   Start Server
+========================= */
 const startServer = async () => {
   try {
     await connectDB();
+
     logger.info("✅ Database connected");
 
     httpServer.listen(PORT, () => {
       logger.info(`✅ Server running on port ${PORT}`);
-      logger.info(`📝 Environment: ${process.env.NODE_ENV}`);
+      logger.info(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
       logger.info(`🌐 Allowed origins: ${allowedOrigins.join(", ")}`);
     });
-
-    process.on("SIGTERM", () => {
-      logger.info("SIGTERM received, shutting down gracefully...");
-      httpServer.close(() => {
-        logger.info("Server closed");
-        process.exit(0);
-      });
-    });
-
-    process.on("SIGINT", () => {
-      logger.info("SIGINT received, shutting down gracefully...");
-      httpServer.close(() => {
-        logger.info("Server closed");
-        process.exit(0);
-      });
-    });
   } catch (error) {
-    logger.error(`Failed to start server: ${error.message}`);
+    logger.error(`❌ Failed to start server: ${error.message}`);
     process.exit(1);
   }
 };
+
+const gracefulShutdown = (signal) => {
+  logger.info(`${signal} received, shutting down gracefully...`);
+
+  httpServer.close(() => {
+    logger.info("Server closed");
+    process.exit(0);
+  });
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 startServer();
 
