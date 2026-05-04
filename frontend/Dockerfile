@@ -42,13 +42,18 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=optional=false
+
+# ✅ correct install
+RUN npm install --include=optional
+
+# 🔥 fix rollup bug
+RUN npm install @rollup/rollup-linux-x64-gnu --no-save
 
 COPY . .
+
 RUN npm run build
 
 
-# Production stage
 FROM node:20-bookworm-slim
 
 WORKDIR /app
