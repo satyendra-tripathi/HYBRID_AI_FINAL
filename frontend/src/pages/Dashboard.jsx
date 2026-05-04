@@ -5,7 +5,7 @@ import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'https://hybrid-ai-final-1.onrender.com';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);

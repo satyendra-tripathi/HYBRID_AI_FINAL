@@ -224,7 +224,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   const API_URL = useMemo(() => {
-    return import.meta.env.VITE_API_URL || "http://localhost:5000";
+    return import.meta.env.VITE_API_URL || "https://hybrid-ai-final-1.onrender.com";
   }, []);
 
   const [loading, setLoading] = useState(false);
