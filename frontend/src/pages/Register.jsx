@@ -214,18 +214,14 @@
 
 // export default Register;
 
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff, FiLock, FiMail, FiUser } from "react-icons/fi";
 import { toast } from "react-hot-toast";
+import { authAPI } from "../utils/api.js";
 
 const Register = () => {
   const navigate = useNavigate();
-
-  const API_URL = useMemo(() => {
-    return import.meta.env.VITE_API_URL || "https://hybrid-ai-final-1.onrender.com";
-  }, []);
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -240,24 +236,30 @@ const Register = () => {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) navigate("/dashboard");
+    if (localStorage.getItem("token")) {
+      navigate("/dashboard");
+    }
   }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-    setError("");
+
+    if (error) setError("");
   };
 
   const validateForm = () => {
-    const { name, email, password, confirmPassword } = formData;
+    const name = formData.name.trim();
+    const email = formData.email.trim();
+    const password = formData.password;
+    const confirmPassword = formData.confirmPassword;
 
-    if (!name.trim()) return "Name is required";
-    if (name.trim().length < 2) return "Name must be at least 2 characters";
+    if (!name) return "Name is required";
+    if (name.length < 2) return "Name must be at least 2 characters";
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) return "Invalid email address";
@@ -294,26 +296,18 @@ const Register = () => {
         password: formData.password,
       };
 
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
-      }
+      await authAPI.register(payload);
 
       toast.success("Registration successful! Please login.");
       navigate("/login");
     } catch (err) {
-      setError(err.message || "Registration failed");
-      toast.error(err.message || "Registration failed");
+      const message =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Registration failed";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
