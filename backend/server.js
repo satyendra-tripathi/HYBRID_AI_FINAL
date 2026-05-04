@@ -72,6 +72,10 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // HTTP logging
+
+app.get("/", (req, res) => {
+  res.send("API is running 🚀");
+});
 app.use(morgan('combined', {
   skip: (req) => req.path === '/health',
 }));
