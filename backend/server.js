@@ -252,7 +252,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
-  "https://hybrid-ai-final-2.onrender.com",
+  "https://hybrid-ai-final-1.onrender.com/",
 ].filter(Boolean);
 
 const corsOptions = {
