@@ -119,14 +119,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const isLoginPage = window.location.pathname === "/login";
-    const isRegisterPage = window.location.pathname === "/register";
+    const isAuthPage =
+      window.location.pathname === "/login" ||
+      window.location.pathname === "/register";
 
-    if (
-      error.response?.status === 401 &&
-      !isLoginPage &&
-      !isRegisterPage
-    ) {
+    if (error.response?.status === 401 && !isAuthPage) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
@@ -142,6 +139,7 @@ export const authAPI = {
       name: data.name?.trim(),
       email: data.email?.trim().toLowerCase(),
       password: data.password,
+      confirmPassword: data.confirmPassword || data.password,
     };
 
     return api.post("/api/auth/register", payload);
@@ -157,33 +155,63 @@ export const authAPI = {
   },
 
   getCurrentUser: () => api.get("/api/auth/me"),
+
   updateProfile: (data) => api.put("/api/auth/profile", data),
+
   updatePreferences: (data) => api.patch("/api/auth/preferences", data),
-  logout: () => api.post("/api/auth/logout"),
+
+  logout: async () => {
+    try {
+      return await api.post("/api/auth/logout");
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
+  },
 };
 
 export const analyzeAPI = {
   analyzeTraffic: (data) => api.post("/api/analyze", data),
+
   analyzeTrafficBatch: (data) => api.post("/api/analyze/batch", data),
+
   getStatistics: (days = 7) =>
-    api.get("/api/analyze/statistics", { params: { days } }),
+    api.get("/api/analyze/statistics", {
+      params: { days },
+    }),
+
   getSeverityTimeline: (days = 7) =>
-    api.get("/api/analyze/severity-timeline", { params: { days } }),
+    api.get("/api/analyze/severity-timeline", {
+      params: { days },
+    }),
 };
 
 export const logsAPI = {
   getLogs: (page = 1, limit = 20, attackType = "All", severity = "All") =>
     api.get("/api/logs", {
-      params: { page, limit, attackType, severity },
+      params: {
+        page,
+        limit,
+        attackType,
+        severity,
+      },
     }),
 
   getLogById: (id) => api.get(`/api/logs/${id}`),
+
   searchLogs: (params) => api.get("/api/logs/search", { params }),
+
   updateLogStatus: (id, data) => api.patch(`/api/logs/${id}/status`, data),
+
   killLog: (id) => api.post(`/api/logs/${id}/kill`),
+
   deleteLog: (id) => api.delete(`/api/logs/${id}`),
+
   getLogStats: (days = 30) =>
-    api.get("/api/logs/stats", { params: { days } }),
+    api.get("/api/logs/stats", {
+      params: { days },
+    }),
+
   exportLogsCSV: () =>
     api.get("/api/logs/export/csv", {
       responseType: "blob",
