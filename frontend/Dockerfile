@@ -1,5 +1,6 @@
-FROM node:18-alpine AS builder
+# FROM node:18-alpine AS builder
 
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy package files
