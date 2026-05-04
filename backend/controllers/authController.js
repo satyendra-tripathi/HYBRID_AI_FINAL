@@ -1,49 +1,53 @@
-import User from '../models/User.js';
-import { generateToken } from '../middleware/auth.js';
-import { asyncHandler, ConflictError, AuthenticationError } from '../middleware/errorHandler.js';
-import logger from '../utils/logger.js';
+import User from "../models/User.js";
+import { generateToken } from "../middleware/auth.js";
+import {
+  asyncHandler,
+  ConflictError,
+  AuthenticationError,
+  AppError,
+} from "../middleware/errorHandler.js";
+import logger from "../utils/logger.js";
+import { isValidEmail, isValidPassword } from "../config/security.js";
+
+const normalizeEmail = (email = "") => email.trim().toLowerCase();
+
+const buildAuthResponse = (user, token) => ({
+  user: user.getPublicProfile(),
+  token,
+  expiresIn: process.env.JWT_EXPIRATION || "7d",
+});
 
 /**
  * Register new user
  * POST /api/auth/register
  */
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.validatedData;
+  const { name, password } = req.validatedData;
+  const email = normalizeEmail(req.validatedData.email);
 
-  // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    throw new ConflictError('Email already registered');
+    throw new ConflictError("Email already registered");
   }
 
-  // Create new user
   const user = new User({
-    name,
+    name: name.trim(),
     email,
     password,
-    role: 'user',
+    role: "user",
     isActive: true,
   });
 
-  // Save user (password will be hashed by pre-save middleware)
   await user.save();
 
   logger.info(`New user registered: ${email}`);
 
-  // Generate JWT token
   const token = generateToken(user._id);
-
-  // Get public profile
-  const userProfile = user.getPublicProfile();
 
   return res.status(201).json({
     success: true,
-    message: 'User registered successfully',
-    data: {
-      user: userProfile,
-      token,
-      expiresIn: process.env.JWT_EXPIRATION,
-    },
+    message: "User registered successfully",
+    data: buildAuthResponse(user, token),
   });
 });
 
@@ -52,65 +56,61 @@ export const register = asyncHandler(async (req, res) => {
  * POST /api/auth/login
  */
 export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.validatedData;
+  const email = normalizeEmail(req.validatedData.email);
+  const { password } = req.validatedData;
 
-  // Find user by email and select password
-  const user = await User.findOne({ email }).select('+password +loginAttempts +lockUntil');
+  const user = await User.findOne({ email }).select(
+    "+password +loginAttempts +lockUntil"
+  );
 
   if (!user) {
     logger.warn(`Login attempt with non-existent email: ${email}`);
-    throw new AuthenticationError('Invalid credentials');
+    throw new AuthenticationError("Invalid credentials");
   }
 
-  // Check if account is locked
-  if (user.isAccountLocked()) {
+  if (typeof user.isAccountLocked === "function" && user.isAccountLocked()) {
     logger.warn(`Login attempt on locked account: ${email}`);
     throw new AuthenticationError(
-      'Account is locked due to multiple failed login attempts. Try again later.'
+      "Account is locked due to multiple failed login attempts. Try again later."
     );
   }
 
-  // Check if user is active
   if (!user.isActive) {
-    throw new AuthenticationError('User account is inactive');
+    throw new AuthenticationError("User account is inactive");
   }
 
-  // Verify password
   const isPasswordValid = await user.comparePassword(password);
 
   if (!isPasswordValid) {
-    await user.recordFailedLogin();
+    if (typeof user.recordFailedLogin === "function") {
+      await user.recordFailedLogin();
+    }
+
     logger.warn(`Failed login attempt for user: ${email}`);
-    throw new AuthenticationError('Invalid credentials');
+    throw new AuthenticationError("Invalid credentials");
   }
 
-  // Reset login attempts on successful login
-  await user.resetLoginAttempts();
+  if (typeof user.resetLoginAttempts === "function") {
+    await user.resetLoginAttempts();
+  }
 
-  // Update metadata
   user.metadata = {
+    ...(user.metadata || {}),
     lastIP: req.ip,
-    userAgent: req.get('user-agent'),
+    userAgent: req.get("user-agent"),
     loginCount: (user.metadata?.loginCount || 0) + 1,
   };
+
   await user.save();
 
   logger.info(`User logged in: ${email}`);
 
-  // Generate JWT token
   const token = generateToken(user._id);
-
-  // Get public profile
-  const userProfile = user.getPublicProfile();
 
   return res.status(200).json({
     success: true,
-    message: 'Login successful',
-    data: {
-      user: userProfile,
-      token,
-      expiresIn: process.env.JWT_EXPIRATION,
-    },
+    message: "Login successful",
+    data: buildAuthResponse(user, token),
   });
 });
 
@@ -119,13 +119,11 @@ export const login = asyncHandler(async (req, res) => {
  * GET /api/auth/me
  */
 export const getCurrentUser = asyncHandler(async (req, res) => {
-  const user = req.user;
-
   return res.status(200).json({
     success: true,
-    message: 'User profile retrieved',
+    message: "User profile retrieved",
     data: {
-      user: user.getPublicProfile(),
+      user: req.user.getPublicProfile(),
     },
   });
 });
@@ -136,19 +134,26 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
  */
 export const updateProfile = asyncHandler(async (req, res) => {
   const { name, currentPassword, newPassword } = req.validatedData;
-  const user = await User.findById(req.user._id).select('+password');
 
-  // Update name if provided
-  if (name) {
-    user.name = name;
+  const user = await User.findById(req.user._id).select("+password");
+
+  if (!user) {
+    throw new AuthenticationError("User not found");
   }
 
-  // Update password if provided
+  if (name) {
+    user.name = name.trim();
+  }
+
   if (newPassword) {
-    // Verify current password
+    if (!currentPassword) {
+      throw new AuthenticationError("Current password is required");
+    }
+
     const isPasswordValid = await user.comparePassword(currentPassword);
+
     if (!isPasswordValid) {
-      throw new AuthenticationError('Current password is incorrect');
+      throw new AuthenticationError("Current password is incorrect");
     }
 
     user.password = newPassword;
@@ -159,7 +164,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Profile updated successfully',
+    message: "Profile updated successfully",
     data: {
       user: user.getPublicProfile(),
     },
@@ -174,13 +179,23 @@ export const updatePreferences = asyncHandler(async (req, res) => {
   const { emailNotifications, alertsOnHighSeverity, theme } = req.body;
   const user = req.user;
 
-  if (emailNotifications !== undefined) {
+  user.preferences = user.preferences || {};
+
+  if (typeof emailNotifications === "boolean") {
     user.preferences.emailNotifications = emailNotifications;
   }
-  if (alertsOnHighSeverity !== undefined) {
+
+  if (typeof alertsOnHighSeverity === "boolean") {
     user.preferences.alertsOnHighSeverity = alertsOnHighSeverity;
   }
+
   if (theme !== undefined) {
+    const allowedThemes = ["light", "dark", "system"];
+
+    if (!allowedThemes.includes(theme)) {
+      throw new AppError("Invalid theme value", 400);
+    }
+
     user.preferences.theme = theme;
   }
 
@@ -188,7 +203,7 @@ export const updatePreferences = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Preferences updated',
+    message: "Preferences updated",
     data: {
       preferences: user.preferences,
     },
@@ -196,34 +211,34 @@ export const updatePreferences = asyncHandler(async (req, res) => {
 });
 
 /**
- * Request password reset
+ * Forgot password
  * POST /api/auth/forgot-password
  */
 export const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
+  const email = normalizeEmail(req.body.email);
+
+  if (!email || !isValidEmail(email)) {
+    throw new AppError("Valid email is required", 400);
+  }
 
   const user = await User.findOne({ email });
 
   if (!user) {
-    // Don't reveal if user exists for security
     return res.status(200).json({
       success: true,
-      message: 'If email exists, reset link will be sent',
+      message: "If email exists, reset link will be sent",
     });
   }
 
-  // Create reset token
   const resetToken = user.createPasswordResetToken();
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   logger.info(`Password reset requested for: ${email}`);
 
-  // In production, send email with reset link
-  // For now, return token for testing
   return res.status(200).json({
     success: true,
-    message: 'Password reset link sent to email',
-    ...(process.env.NODE_ENV === 'development' && { resetToken }),
+    message: "If email exists, reset link will be sent",
+    ...(process.env.NODE_ENV === "development" && { resetToken }),
   });
 });
 
@@ -232,12 +247,34 @@ export const forgotPassword = asyncHandler(async (req, res) => {
  * POST /api/auth/reset-password
  */
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { email, token, newPassword } = req.body;
+  const email = normalizeEmail(req.body.email);
+  const { token, newPassword } = req.body;
 
-  const user = await User.findOne({ email }).select('+passwordResetToken +passwordResetExpires');
+  if (!email || !token || !newPassword) {
+    throw new AppError("Email, token and new password are required", 400);
+  }
 
-  if (!user || !user.verifyPasswordResetToken(token)) {
-    throw new AuthenticationError('Invalid or expired reset token');
+  if (!isValidEmail(email)) {
+    throw new AppError("Invalid email", 400);
+  }
+
+  if (!isValidPassword(newPassword)) {
+    throw new AppError(
+      "Password must contain uppercase, lowercase, number and special character",
+      400
+    );
+  }
+
+  const user = await User.findOne({ email }).select(
+    "+passwordResetToken +passwordResetExpires"
+  );
+
+  if (
+    !user ||
+    typeof user.verifyPasswordResetToken !== "function" ||
+    !user.verifyPasswordResetToken(token)
+  ) {
+    throw new AuthenticationError("Invalid or expired reset token");
   }
 
   user.password = newPassword;
@@ -250,20 +287,20 @@ export const resetPassword = asyncHandler(async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: 'Password reset successfully',
+    message: "Password reset successfully",
   });
 });
 
 /**
- * Logout (revoke token on client side)
+ * Logout
  * POST /api/auth/logout
  */
 export const logout = asyncHandler(async (req, res) => {
-  logger.info(`User logged out: ${req.user.email}`);
+  logger.info(`User logged out: ${req.user?.email || "unknown"}`);
 
   return res.status(200).json({
     success: true,
-    message: 'Logout successful',
+    message: "Logout successful",
   });
 });
 

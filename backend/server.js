@@ -217,13 +217,18 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import morgan from "morgan";
 
 import connectDB from "./config/database.js";
-import { helmetConfig, createRateLimiter } from "./config/security.js";
+import {
+  helmetConfig,
+  corsConfig,
+  corsOptions,
+  allowedOrigins,
+  createRateLimiter,
+} from "./config/security.js";
 
 import {
   notFoundHandler,
@@ -242,49 +247,16 @@ import tabRoutes from "./routes/tabRoutes.js";
 
 const app = express();
 const httpServer = createServer(app);
-
 const PORT = process.env.PORT || 5000;
 
-const envOrigins = [
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL,
-  process.env.CORS_ORIGINS,
-]
-  .filter(Boolean)
-  .flatMap((origin) => origin.split(","))
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+/* =========================
+   Render / Proxy Support
+========================= */
+app.set("trust proxy", 1);
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:5175",
-  "http://localhost:5176",
-  "https://hybrid-ai-final-4.onrender.com",
-  ...envOrigins,
-];
-
-const isAllowedOrigin = (origin) => {
-  if (!origin) return true;
-  return allowedOrigins.includes(origin);
-};
-
-const corsOptions = {
-  origin(origin, callback) {
-    if (isAllowedOrigin(origin)) {
-      return callback(null, true);
-    }
-
-    logger.warn(`❌ CORS blocked origin: ${origin}`);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 204,
-};
-
+/* =========================
+   Socket.IO
+========================= */
 const io = new Server(httpServer, {
   cors: corsOptions,
 });
@@ -295,17 +267,13 @@ app.set("io", io);
    Security + CORS
 ========================= */
 app.use(helmetConfig);
-app.use(cors(corsOptions));
+app.use(corsConfig);
 
-/*
-  Express 5 me app.options("*") kabhi-kabhi crash karta hai.
-  app.use(cors()) already OPTIONS/preflight handle kar deta hai.
-*/
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 /* =========================
-   Health / Root
+   Root / Health
 ========================= */
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -347,13 +315,14 @@ const limiter = createRateLimiter(15 * 60 * 1000, 100);
 app.use(limiter);
 
 /* =========================
-   Socket.IO
+   Socket Events
 ========================= */
 io.on("connection", (socket) => {
   logger.info(`🔌 Client connected: ${socket.id}`);
 
   socket.on("join", (room) => {
     if (!room) return;
+
     socket.join(room);
     logger.info(`👤 Client ${socket.id} joined room: ${room}`);
   });
@@ -383,7 +352,7 @@ app.get("/api/info", (req, res) => {
 });
 
 /* =========================
-   Routes
+   API Routes
 ========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/analyze", analyzeRoutes);
