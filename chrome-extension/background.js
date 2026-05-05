@@ -4,7 +4,7 @@
 // const API_URL = "http://127.0.0.1:5000/api/tab";
 
 // Deployed backend:
-const API_URL = "https://hybrid-ai-final-4.onrender.com/api/tab";
+const API_URL = "https://hybrid-ai-final-1.onrender.com/api/tab";
 
 async function sendTab(tab) {
   if (!tab?.url || !tab.url.startsWith("http")) return;

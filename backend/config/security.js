@@ -174,6 +174,11 @@ export const corsOptions = {
 
     const cleanOrigin = origin.replace(/\/$/, "");
 
+    // Allow chrome extension requests
+    if (cleanOrigin.startsWith("chrome-extension://")) {
+      return callback(null, true);
+    }
+
     if (allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }

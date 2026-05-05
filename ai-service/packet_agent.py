@@ -124,7 +124,7 @@ def handle_packet(pkt):
     }
 
     try:
-        res = requests.post(API_URL, json=payload, headers=headers, timeout=5)
+        res = requests.post(API_URL, json=payload, headers=headers, timeout=30)
         if res.status_code == 200:
             domain_info = f" ({real_domain})" if real_domain != "Unknown" else ""
             print(f"[{time.strftime('%X')}] 🌐 {protocol} -> {dst_ip}:{dst_port}{domain_info} [{source}]")
