@@ -154,12 +154,42 @@ export const tabSync = asyncHandler(async (req, res) => {
   };
 
   logger.info(`Tab synced: ${cleanDomain} -> ${title || cleanDomain}`);
-
   return res.status(200).json({
     success: true,
     message: 'Tab synced successfully',
   });
 });
+
+export const tabSyncBatch = asyncHandler(async (req, res) => {
+  const { tabs } = req.body;
+
+  if (!Array.isArray(tabs)) {
+    throw new AppError('Tabs must be an array', 400);
+  }
+
+  global.tabMap = global.tabMap || {};
+
+  tabs.forEach((tab) => {
+    if (!tab.domain) return;
+    const cleanDomain = normalizeDomain(tab.domain);
+    global.tabMap[cleanDomain] = {
+      title: tab.title || cleanDomain,
+      url: tab.url || '',
+      tabId: tab.tabId || null,
+      windowId: tab.windowId || null,
+      active: Boolean(tab.active),
+      lastSeenAt: new Date(),
+    };
+  });
+
+  logger.info(`Batch synced ${tabs.length} tabs`);
+
+  return res.status(200).json({
+    success: true,
+    message: `Synced ${tabs.length} tabs successfully`,
+  });
+});
+
 
 const callAIService = async (features) => {
   logger.info(`[DEBUG] Calling AI Service at: ${process.env.AI_SERVICE_URL}/predict`);
@@ -545,7 +575,9 @@ export const getSeverityTimeline = asyncHandler(async (req, res) => {
 
 export default {
   tabSync,
+  tabSyncBatch,
   analyzeTraffic,
+
   analyzeTrafficBatch,
   getStatistics,
   getSeverityTimeline,
