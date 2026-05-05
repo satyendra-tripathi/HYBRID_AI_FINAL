@@ -18,6 +18,7 @@ function formatTab(tab) {
       tabId: tab.id,
       windowId: tab.windowId,
       active: tab.active || false,
+      lastSeenAt: new Date().toISOString()
     };
   } catch (e) {
     return null;

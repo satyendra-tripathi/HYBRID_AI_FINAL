@@ -218,8 +218,8 @@ export const Logs = () => {
                           <span className="text-xs" title={`Detected via ${log.detection_source}`}>
                             {log.detection_source === 'SNI' || log.detection_source === 'HTTP' ? '🌐' : '☁️'}
                           </span>
-                          <span className="text-slate-200 font-bold truncate max-w-[200px]" title={log.tab_title || log.real_domain}>
-                            {log.tab_title || (log.real_domain && log.real_domain !== 'Unknown' ? log.real_domain : 'Unknown Tab')}
+                          <span className="text-slate-200 font-bold truncate max-w-[200px]" title={log.tab_title || log.real_domain || log.app_name || log.dst_domain}>
+                            {log.tab_title || log.real_domain || log.app_name || log.dst_domain || 'Unknown'}
                           </span>
                         </div>
                         <span className="text-[10px] text-slate-500 truncate max-w-[200px] flex items-center gap-1" title={log.real_domain}>

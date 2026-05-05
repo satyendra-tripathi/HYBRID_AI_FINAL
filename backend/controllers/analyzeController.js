@@ -16,37 +16,37 @@ const normalizeDomain = (value = '') =>
 const isUnknown = (value) =>
   !value || ['unknown', 'unknown tab', 'unknown tab (cdn)'].includes(String(value).toLowerCase());
 
-const findBestTab = (...domains) => {
+const findMatchingTab = (realDomain, dstDomain, dstHost) => {
   global.tabMap = global.tabMap || {};
 
-  const candidates = domains
+  const candidates = [realDomain, dstDomain, dstHost]
     .filter(Boolean)
     .map(normalizeDomain)
     .filter(Boolean);
 
   const entries = Object.entries(global.tabMap);
 
+  logger.debug(`[DEBUG] Tab matching - candidates: ${candidates.join(', ')}, available tabs: ${entries.length}`);
+
   for (const candidate of candidates) {
     // 1. Exact match
-    if (global.tabMap[candidate]) return global.tabMap[candidate];
+    if (global.tabMap[candidate]) {
+      logger.debug(`[DEBUG] Exact match found: ${candidate} -> ${global.tabMap[candidate].title}`);
+      return global.tabMap[candidate];
+    }
 
-    // 2. Fuzzy match (subdomain or parent domain)
+    // 2. Subdomain match (e.g., sub.example.com matches example.com)
     const match = entries.find(([key]) =>
       candidate.includes(key) || key.includes(candidate)
     );
 
-    if (match) return match[1];
+    if (match) {
+      logger.debug(`[DEBUG] Subdomain match found: ${candidate} -> ${match[1].title}`);
+      return match[1];
+    }
   }
 
-  // 3. Fallback to the MOST RECENTLY SEEN active tab
-  const activeTabs = entries
-    .filter(([, tab]) => tab?.active)
-    .sort((a, b) => new Date(b[1].lastSeenAt || 0) - new Date(a[1].lastSeenAt || 0));
-
-  if (activeTabs.length > 0) {
-    return activeTabs[0][1];
-  }
-
+  logger.debug(`[DEBUG] No reliable tab match for candidates: ${candidates.join(', ')}`);
   return null;
 };
 
@@ -83,30 +83,24 @@ const enhanceTrafficLog = async ({ trafficLog, traffic, aiResult }) => {
     trafficLog.dst_domain = dstDomain;
     trafficLog.service_name = getServiceName(traffic.dst_port);
 
-    const tabInfo = findBestTab(
-      realDomain,
-      traffic.domain,
-      dstDomainClean,
-      dstHostClean,
-      srcDomain
-    );
+    // Use new matching logic - NO active tab fallback
+    const matchedTab = findMatchingTab(realDomain, dstDomainClean, dstHostClean);
 
-    if (tabInfo) {
-      trafficLog.real_domain =
-        realDomain || dstDomainClean || dstHostClean || 'Unknown Tab';
-
-      trafficLog.detection_source =
-        traffic.detection_source || 'Chrome Extension';
-
-      trafficLog.app_name = tabInfo.title || trafficLog.real_domain;
-      trafficLog.tab_title = tabInfo.title || null;
-      trafficLog.tab_url = tabInfo.url || null;
+    if (matchedTab) {
+      // Priority 1: Matched tab found
+      trafficLog.app_name = matchedTab.title;
+      trafficLog.tab_title = matchedTab.title;
+      trafficLog.real_domain = matchedTab.domain;
+      trafficLog.detection_source = 'Chrome Extension';
+      trafficLog.tab_url = matchedTab.url || null;
     } else if (!isUnknown(realDomain)) {
+      // Priority 2: real_domain exists
+      trafficLog.app_name = getDomainFriendlyName(realDomain, realDomain);
+      trafficLog.tab_title = null;
       trafficLog.real_domain = realDomain;
       trafficLog.detection_source = traffic.detection_source || 'SNI/DNS';
-      trafficLog.app_name = getDomainFriendlyName(realDomain, realDomain);
-      trafficLog.tab_title = traffic.tab_title || null;
     } else {
+      // Priority 3: Fallback to DNS/domain logic
       const cdnKeywords = [
         'cloudflare',
         'amazonaws',
@@ -145,7 +139,7 @@ const enhanceTrafficLog = async ({ trafficLog, traffic, aiResult }) => {
 };
 
 export const tabSync = asyncHandler(async (req, res) => {
-  const { domain, title, url, tabId, windowId, active } = req.body;
+  const { domain, title, url, tabId, windowId, active, lastSeenAt } = req.body;
 
   if (!domain) {
     throw new AppError('Domain is required', 400);
@@ -158,10 +152,11 @@ export const tabSync = asyncHandler(async (req, res) => {
   global.tabMap[cleanDomain] = {
     title: title || cleanDomain,
     url: url || '',
+    domain: cleanDomain,
     tabId: tabId || null,
     windowId: windowId || null,
     active: Boolean(active),
-    lastSeenAt: new Date(),
+    lastSeenAt: lastSeenAt || new Date().toISOString(),
   };
 
   logger.info(`Tab synced: ${cleanDomain} -> ${title || cleanDomain}`);
@@ -186,20 +181,21 @@ export const tabSyncBatch = asyncHandler(async (req, res) => {
   });
 
   tabs.forEach((tab) => {
-
     if (!tab.domain) return;
     const cleanDomain = normalizeDomain(tab.domain);
     global.tabMap[cleanDomain] = {
       title: tab.title || cleanDomain,
       url: tab.url || '',
+      domain: cleanDomain,
       tabId: tab.tabId || null,
       windowId: tab.windowId || null,
       active: Boolean(tab.active),
-      lastSeenAt: new Date(),
+      lastSeenAt: tab.lastSeenAt || new Date().toISOString(),
     };
   });
 
   logger.info(`Batch synced ${tabs.length} tabs`);
+  logger.debug(`[DEBUG] Current tab map: ${Object.keys(global.tabMap).join(', ')}`);
 
   return res.status(200).json({
     success: true,
