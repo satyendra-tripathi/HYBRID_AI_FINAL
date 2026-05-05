@@ -27,8 +27,10 @@ const findBestTab = (...domains) => {
   const entries = Object.entries(global.tabMap);
 
   for (const candidate of candidates) {
+    // 1. Exact match
     if (global.tabMap[candidate]) return global.tabMap[candidate];
 
+    // 2. Fuzzy match (subdomain or parent domain)
     const match = entries.find(([key]) =>
       candidate.includes(key) || key.includes(candidate)
     );
@@ -36,9 +38,18 @@ const findBestTab = (...domains) => {
     if (match) return match[1];
   }
 
-  const activeTab = entries.find(([, tab]) => tab?.active);
-  return activeTab ? activeTab[1] : null;
+  // 3. Fallback to the MOST RECENTLY SEEN active tab
+  const activeTabs = entries
+    .filter(([, tab]) => tab?.active)
+    .sort((a, b) => new Date(b[1].lastSeenAt || 0) - new Date(a[1].lastSeenAt || 0));
+
+  if (activeTabs.length > 0) {
+    return activeTabs[0][1];
+  }
+
+  return null;
 };
+
 
 const enhanceTrafficLog = async ({ trafficLog, traffic, aiResult }) => {
   let srcHost = 'Unknown';
@@ -169,7 +180,13 @@ export const tabSyncBatch = asyncHandler(async (req, res) => {
 
   global.tabMap = global.tabMap || {};
 
+  // Reset active status for all existing tabs in the map
+  Object.keys(global.tabMap).forEach((key) => {
+    global.tabMap[key].active = false;
+  });
+
   tabs.forEach((tab) => {
+
     if (!tab.domain) return;
     const cleanDomain = normalizeDomain(tab.domain);
     global.tabMap[cleanDomain] = {

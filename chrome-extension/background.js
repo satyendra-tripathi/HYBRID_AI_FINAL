@@ -2,7 +2,7 @@
 
 // Backend URLs
 const API_BASE = "https://hybrid-ai-final-1.onrender.com/api/tab";
-const SYNC_INTERVAL_MINUTES = 1; // Sync all tabs every 1 minute
+const SYNC_INTERVAL_MINUTES = 1;
 
 /**
  * Format tab object for the backend
@@ -47,6 +47,7 @@ async function sendTab(tab) {
 
 /**
  * Sync all open tabs using the batch endpoint
+ * This is preferred as it ensures the backend has the correct 'active' state for all tabs.
  */
 async function syncAllTabs() {
   try {
@@ -75,22 +76,17 @@ async function syncAllTabs() {
 // EVENT LISTENERS
 // ----------------------------------------------------------------------------
 
-// On Installation or Update
 chrome.runtime.onInstalled.addListener(() => {
   console.log("🚀 Extension Installed");
   syncAllTabs();
-  
-  // Create alarm for periodic sync
   chrome.alarms.create("sync_tabs", { periodInMinutes: SYNC_INTERVAL_MINUTES });
 });
 
-// On Startup
 chrome.runtime.onStartup.addListener(() => {
   console.log("💻 Browser Startup");
   syncAllTabs();
 });
 
-// On Alarm
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "sync_tabs") {
     syncAllTabs();
@@ -98,38 +94,29 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 // When a new tab is created
-chrome.tabs.onCreated.addListener((tab) => {
-  // Wait a bit for URL to be available (often starts as 'about:blank')
-  setTimeout(() => {
-    chrome.tabs.get(tab.id, (updatedTab) => {
-      if (updatedTab) sendTab(updatedTab);
-    });
-  }, 1000);
+chrome.tabs.onCreated.addListener(() => {
+  // Use batch sync to ensure all states are consistent
+  setTimeout(syncAllTabs, 2000);
 });
 
-// When a tab is updated (URL change, title change, loading status)
+// When a tab is updated
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Sync immediately on URL change or when status is complete
   if (changeInfo.url || changeInfo.status === "complete" || changeInfo.title) {
-    sendTab(tab);
+    // If it's a major change, sync all to ensure 'active' and other flags are correct
+    syncAllTabs();
   }
 });
 
-// When active tab changes
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  try {
-    const tab = await chrome.tabs.get(activeInfo.tabId);
-    sendTab(tab);
-  } catch (err) {
-    console.error("onActivated error:", err);
-  }
+// When active tab changes - CRITICAL for correct mapping
+chrome.tabs.onActivated.addListener(() => {
+  console.log("🔄 Tab activated - triggering full sync");
+  syncAllTabs();
 });
 
 // When a tab is removed
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  // We don't have a remove endpoint on backend yet, but we could trigger a full sync to refresh the map
-  // For now, just log it. Full sync happens via alarm.
-  console.log("🗑️ Tab closed:", tabId);
+chrome.tabs.onRemoved.addListener(() => {
+  console.log("🗑️ Tab closed - triggering full sync");
+  syncAllTabs();
 });
 
 // Initial run
