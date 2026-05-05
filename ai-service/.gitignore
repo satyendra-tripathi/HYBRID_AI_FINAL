@@ -47,9 +47,9 @@ logs/
 *.log
 
 # Models
-models/*.pkl
-models/*.h5
-models/*.joblib
+# models/*.pkl
+# models/*.h5
+# models/*.joblib
 
 # Testing
 .pytest_cache/
