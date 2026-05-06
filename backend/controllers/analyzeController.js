@@ -205,7 +205,7 @@ export const tabSyncBatch = asyncHandler(async (req, res) => {
 
 
 const callAIService = async (features) => {
-  const aiServiceBaseUrl = (process.env.AI_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  const aiServiceBaseUrl = (process.env.AI_SERVICE_URL || 'https://ai-x9px.onrender.com').replace(/\/+$/, '');
   const predictUrl = `${aiServiceBaseUrl}/predict`;
 
   logger.info(`[DEBUG] Calling AI Service at: ${predictUrl}`);
