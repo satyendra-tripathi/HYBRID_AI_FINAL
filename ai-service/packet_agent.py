@@ -110,18 +110,16 @@ def handle_packet(pkt):
     real_domain, source = extract_domain(pkt)
 
     payload = {
-        "protocol": protocol,
-        "src_port": src_port,
-        "dst_port": dst_port,
-        "duration": round(duration, 4),
-        "bytes_sent": len(pkt),
-        "bytes_received": 0,
-        "src_ip": src_ip,
-        "dst_ip": dst_ip,
-        "flags": flags,
-        "real_domain": real_domain,
-        "detection_source": source
+        "features": {
+        "protocol": int(protocol),
+        "src_port": int(src_port),
+        "dst_port": int(dst_port),
+        "duration": float(round(duration, 4)),
+        "bytes_sent": float(len(pkt)),
+        "bytes_received": float(0),
+        "flags": int(flags)
     }
+ }
 
     try:
         res = requests.post(API_URL, json=payload, headers=headers, timeout=30)
