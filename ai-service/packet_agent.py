@@ -9,7 +9,7 @@ import time
 import socket
 import threading
 
-API_URL = "https://ai-x9px.onrender.com/predict/api/analyze"
+API_URL = "https://ai-x9px.onrender.com/predict"
 API_KEY = "6c8a35703066cf5c88efc28f1ef4fbf0091a48229bb0f68575558322136be4b4"
 
 headers = {
