@@ -23,10 +23,10 @@ dns_mapping = {} # ip -> domain
 
 def get_protocol(pkt):
     if pkt.haslayer(TCP):
-        return "TCP"
+        return 1   # TCP
     if pkt.haslayer(UDP):
-        return "UDP"
-    return "OTHER"
+        return 2   # UDP
+    return 0 
 
 def handle_dns(pkt):
     """Capture DNS responses to build local IP-domain map"""
@@ -77,7 +77,17 @@ def handle_packet(pkt):
     if not pkt.haslayer(IP):
         return
 
+    # ✅ Protocol detect
     protocol = get_protocol(pkt)
+
+    # 🔥 FIX: convert string → number
+    protocol_map = {
+        "TCP": 1,
+        "UDP": 2,
+        "OTHER": 0
+    }
+    protocol_num = protocol_map.get(protocol, 0)
+
     src_port = 0
     dst_port = 0
     flags = 0
@@ -86,6 +96,7 @@ def handle_packet(pkt):
         src_port = pkt[TCP].sport
         dst_port = pkt[TCP].dport
         flags = int(pkt[TCP].flags)
+
     elif pkt.haslayer(UDP):
         src_port = pkt[UDP].sport
         dst_port = pkt[UDP].dport
@@ -93,41 +104,53 @@ def handle_packet(pkt):
     src_ip = pkt[IP].src
     dst_ip = pkt[IP].dst
     now = time.time()
-    
-    # Debounce logic
+
+    # ⛔ duplicate spam रोकने के लिए
     global reported_times
     if 'reported_times' not in globals():
         reported_times = {}
-        
+
     if now - reported_times.get(dst_ip, 0) < 5:
         return
+
     reported_times[dst_ip] = now
 
+    # ⏱ duration calculate
     key = f"{src_ip}-{dst_ip}-{src_port}-{dst_port}"
     duration = now - packet_times.get(key, now)
     packet_times[key] = now
 
+    # 🌐 domain extract
     real_domain, source = extract_domain(pkt)
 
+    # ✅ FINAL PAYLOAD (FastAPI compatible)
     payload = {
         "features": {
-        "protocol": int(protocol),
-        "src_port": int(src_port),
-        "dst_port": int(dst_port),
-        "duration": float(round(duration, 4)),
-        "bytes_sent": float(len(pkt)),
-        "bytes_received": float(0),
-        "flags": int(flags)
+            "protocol": int(protocol_num),
+            "src_port": int(src_port),
+            "dst_port": int(dst_port),
+            "duration": float(round(duration, 4)),
+            "bytes_sent": float(len(pkt)),
+            "bytes_received": float(0),
+            "flags": int(flags)
+        }
     }
- }
 
     try:
-        res = requests.post(API_URL, json=payload, headers=headers, timeout=30)
+        res = requests.post(API_URL, json=payload, headers=headers, timeout=10)
+
         if res.status_code == 200:
+            result = res.json()
+
             domain_info = f" ({real_domain})" if real_domain != "Unknown" else ""
-            print(f"[{time.strftime('%X')}] 🌐 {protocol} -> {dst_ip}:{dst_port}{domain_info} [{source}]")
+
+            print(
+                f"[{time.strftime('%X')}] 🌐 {protocol} -> {dst_ip}:{dst_port}{domain_info} "
+                f"[{source}] | Anomaly: {result.get('isAnomaly')} | Type: {result.get('attack_type')}"
+            )
         else:
-            print(f"[{time.strftime('%X')}] ❌ Backend Error: {res.status_code}")
+            print(f"[{time.strftime('%X')}] ❌ Backend Error: {res.status_code} | {res.text}")
+
     except Exception as e:
         print("Backend send error:", e)
 
