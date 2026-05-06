@@ -5,7 +5,12 @@ import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
 // import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
+const SOCKET_URL =
+  import.meta.env.VITE_APP_AI_SERVICE_URL ||
+  import.meta.env.VITE_AI_SERVICE_URL ||
+  import.meta.env.VITE_APP_API_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8000';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -53,7 +58,7 @@ export const Dashboard = () => {
   useEffect(() => {
     fetchData(true);
 
-    const socketUrl = SOCKET_URL.replace(/^http/, 'ws') + '/ws';
+    const socketUrl = SOCKET_URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/ws';
     const socket = new WebSocket(socketUrl);
 
     socket.onopen = () => {
