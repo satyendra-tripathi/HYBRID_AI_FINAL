@@ -16,8 +16,7 @@
     "open_in_tab": true
   },
   "host_permissions": [
-    "http://localhost:5001/*",
-    "http://127.0.0.1:5001/*",
-    "https://hybrid-ai-final-1.onrender.com/*"
+    "https://backend-service-ot4f.onrender.com",
+    "https://backend-service-ot4f.onrender.com"
   ]
 }

@@ -1,6 +1,6 @@
 // chrome-extension/background.js
 
-const DEFAULT_API_BASE = "http://localhost:5001/api/tab";
+const DEFAULT_API_BASE = "https://backend-service-ot4f.onrender.com/api/tab";
 const DEFAULT_SYNC_INTERVAL_MINUTES = 1;
 
 let pendingSync = null;
