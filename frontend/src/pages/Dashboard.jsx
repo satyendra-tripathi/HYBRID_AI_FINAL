@@ -51,34 +51,34 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-  fetchData(true);
+    fetchData(true);
 
-  const socket = new WebSocket("wss://ai-x9px.onrender.com/ws");
+    const socketUrl = SOCKET_URL.replace(/^http/, 'ws') + '/ws';
+    const socket = new WebSocket(socketUrl);
 
-  socket.onopen = () => {
-    console.log("✅ Connected to AI WebSocket");
-  };
+    socket.onopen = () => {
+      console.log('✅ Connected to AI WebSocket', socketUrl);
+    };
 
-  socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-    console.log("🔥 Live Data:", data);
+      console.log('🔥 Live Data:', data);
 
-    // 🔥 UI update
-    setLatestAnomaly(data);
-    setRecentAlerts((prev) => [data, ...prev.slice(0, 4)]);
-  };
+      setLatestAnomaly(data);
+      setRecentAlerts((prev) => [data, ...prev.slice(0, 4)]);
+    };
 
-  socket.onerror = (err) => {
-    console.error("❌ WebSocket error", err);
-  };
+    socket.onerror = (err) => {
+      console.error('❌ WebSocket error', err);
+    };
 
-  socket.onclose = () => {
-    console.log("❌ WebSocket closed");
-  };
+    socket.onclose = () => {
+      console.log('❌ WebSocket closed');
+    };
 
-  return () => socket.close();
-}, [daysFilter]);
+    return () => socket.close();
+  }, [daysFilter]);
 
   if (loading) {
     return (
@@ -90,18 +90,7 @@ export const Dashboard = () => {
       </div>
     );
   }
-useEffect(() => {
-  const socket = new WebSocket("wss://ai-x9px.onrender.com/ws");
 
-  socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-
-    // UI update
-    console.log(data);
-  };
-
-  return () => socket.close();
-}, []);
   const StatCard = ({ icon: Icon, label, value, change, color = 'cyan' }) => (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm hover:border-slate-600 transition-all group">
       <div className="flex items-start justify-between">
