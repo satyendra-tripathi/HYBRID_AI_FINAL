@@ -15,6 +15,26 @@ from typing import Optional, List, Dict
 import tensorflow as tf
 from dotenv import load_dotenv
 
+from fastapi import WebSocket, WebSocketDisconnect
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, data: dict):
+        for connection in self.active_connections:
+            await connection.send_json(data)
+
+manager = ConnectionManager()
+
+
 # Load environment variables
 load_dotenv()
 
@@ -22,6 +42,25 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_to_all(self, data: dict):
+        for connection in self.active_connections:
+            await connection.send_json(data)
+
+manager = ConnectionManager()
 # ============================================================================
 # INITIALIZE FASTAPI APP
 # ============================================================================
@@ -279,7 +318,11 @@ async def predict(request: PredictionRequest):
             attack_type = 'Normal'
         
         processing_time = (time.time() - start_time) * 1000  # Convert to ms
-        
+        await manager.broadcast({
+    "isAnomaly": is_anomaly,
+    "attack_type": attack_type,
+    "confidence": confidence
+})
         return {
             'status': 'success',
             'isAnomaly': is_anomaly,
@@ -296,6 +339,15 @@ async def predict(request: PredictionRequest):
     except Exception as e:
         logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)    
 
 @app.post('/batch-predict')
 async def batch_predict(request: BatchPredictionRequest):
@@ -406,7 +458,9 @@ async def startup_event():
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(
-        app,
-        host=os.getenv('FASTAPI_HOST', '0.0.0.0'),
-        port=int(os.getenv('FASTAPI_PORT', 8000)),
-    )
+    "app:app",
+    host="0.0.0.0",
+    port=int(os.getenv("PORT", 8000)),
+)
+
+

@@ -3,9 +3,9 @@ import { FiAlertCircle, FiCheckCircle, FiTrendingUp, FiPackage, FiActivity, FiTa
 import { analyzeAPI, logsAPI, metricsAPI } from '../utils/api.js';
 import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
-import { io } from 'socket.io-client';
+// import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'https://hybrid-ai-final-1.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -51,27 +51,34 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchData(true);
+  fetchData(true);
 
-    // Initialize Socket
-    const newSocket = io(SOCKET_URL);
-    setSocket(newSocket);
+  const socket = new WebSocket("wss://ai-x9px.onrender.com/ws");
 
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (user && user._id) {
-      newSocket.emit('join', user._id);
-    }
+  socket.onopen = () => {
+    console.log("✅ Connected to AI WebSocket");
+  };
 
-    newSocket.on('new_log', (log) => {
-      fetchData(false); // Refresh data on new log
-    });
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
 
-    newSocket.on('metrics_updated', () => {
-      fetchData(false);
-    });
+    console.log("🔥 Live Data:", data);
 
-    return () => newSocket.disconnect();
-  }, [daysFilter]);
+    // 🔥 UI update
+    setLatestAnomaly(data);
+    setRecentAlerts((prev) => [data, ...prev.slice(0, 4)]);
+  };
+
+  socket.onerror = (err) => {
+    console.error("❌ WebSocket error", err);
+  };
+
+  socket.onclose = () => {
+    console.log("❌ WebSocket closed");
+  };
+
+  return () => socket.close();
+}, [daysFilter]);
 
   if (loading) {
     return (
@@ -83,7 +90,18 @@ export const Dashboard = () => {
       </div>
     );
   }
+useEffect(() => {
+  const socket = new WebSocket("wss://ai-x9px.onrender.com/ws");
 
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    // UI update
+    console.log(data);
+  };
+
+  return () => socket.close();
+}, []);
   const StatCard = ({ icon: Icon, label, value, change, color = 'cyan' }) => (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 backdrop-blur-sm hover:border-slate-600 transition-all group">
       <div className="flex items-start justify-between">
