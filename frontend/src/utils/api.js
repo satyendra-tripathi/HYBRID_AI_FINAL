@@ -1,7 +1,7 @@
 // import axios from 'axios';
 
 // // Get API base URL from environment
-// const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000';
+// const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5001';
 
 // // Create axios instance
 // const api = axios.create({

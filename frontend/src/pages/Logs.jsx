@@ -216,7 +216,14 @@ export const Logs = () => {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs" title={`Detected via ${log.detection_source}`}>
-                            {log.detection_source === 'SNI' || log.detection_source === 'HTTP' ? '🌐' : '☁️'}
+                            {
+  log.detection_source === 'SNI' ||
+  log.detection_source === 'HTTP'
+    ? '🌐'
+    : log.detection_source === 'EXTENSION'
+    ? '🧩'
+    : '☁️'
+}
                           </span>
                           <span className="text-slate-200 font-bold truncate max-w-[200px]" title={log.tab_title || log.real_domain || log.app_name || log.dst_domain}>
                             {log.tab_title || log.real_domain || log.app_name || log.dst_domain || 'Unknown'}

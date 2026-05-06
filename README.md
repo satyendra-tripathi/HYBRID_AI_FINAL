@@ -106,7 +106,7 @@ Create `.env` files:
 
 **backend/.env**
 ```
-PORT=5000
+PORT=5001
 MONGODB_URI=mongodb://localhost:27017/ai-ids
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 AI_SERVICE_URL=http://localhost:8000
@@ -121,7 +121,7 @@ FASTAPI_HOST=0.0.0.0
 
 **frontend/.env**
 ```
-REACT_APP_API_URL=http://localhost:5000
+REACT_APP_API_URL=http://localhost:5001
 ```
 
 ### Step 3: Train AI Models
@@ -186,7 +186,7 @@ Password: AdminPassword123!
 
 ### Register User
 ```bash
-curl -X POST http://localhost:5000/api/auth/register \
+curl -X POST http://localhost:5001/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
@@ -197,7 +197,7 @@ curl -X POST http://localhost:5000/api/auth/register \
 
 ### Login
 ```bash
-curl -X POST http://localhost:5000/api/auth/login \
+curl -X POST http://localhost:5001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "john@example.com",
@@ -207,7 +207,7 @@ curl -X POST http://localhost:5000/api/auth/login \
 
 ### Analyze Traffic
 ```bash
-curl -X POST http://localhost:5000/api/analyze \
+curl -X POST http://localhost:5001/api/analyze \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -222,7 +222,7 @@ curl -X POST http://localhost:5000/api/analyze \
 
 ### Get Logs
 ```bash
-curl -X GET http://localhost:5000/api/logs \
+curl -X GET http://localhost:5001/api/logs \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -356,8 +356,8 @@ echo $MONGODB_URI
 
 ### Frontend Can't Reach Backend
 ```bash
-# Check backend is running on port 5000
-curl http://localhost:5000/health
+# Check backend is running on port 5001
+curl http://localhost:5001/health
 
 # Verify REACT_APP_API_URL in .env
 ```

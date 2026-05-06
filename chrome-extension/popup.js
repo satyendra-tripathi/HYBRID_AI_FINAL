@@ -43,7 +43,7 @@ function loadStatus() {
 function loadConfig() {
   chrome.storage.sync.get(
     {
-      apiBase: 'http://localhost:5000/api/tab',
+      apiBase: 'http://localhost:5001/api/tab',
       apiKey: '',
     },
     (result) => {

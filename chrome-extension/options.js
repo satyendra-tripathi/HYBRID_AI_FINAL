@@ -5,11 +5,11 @@ const saveButton = document.getElementById('saveButton');
 function loadSettings() {
   chrome.storage.sync.get(
     {
-      apiBase: 'http://localhost:5000/api/tab',
+      apiBase: 'http://localhost:5001/api/tab',
       apiKey: '',
     },
     (result) => {
-      apiBaseInput.value = result.apiBase || 'http://localhost:5000/api/tab';
+      apiBaseInput.value = result.apiBase || 'http://localhost:5001/api/tab';
       apiKeyInput.value = result.apiKey || '';
     }
   );

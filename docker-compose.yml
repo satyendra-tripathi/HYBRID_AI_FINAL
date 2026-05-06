@@ -54,9 +54,9 @@ services:
       dockerfile: Dockerfile
     container_name: ai-ids-backend
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
-      PORT: 5000
+      PORT: 5001
       NODE_ENV: production
       MONGODB_URI: mongodb://admin:admin123@mongodb:27017/ai-ids?authSource=admin
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
@@ -74,7 +74,7 @@ services:
       ai-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,7 +88,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:5000
+      REACT_APP_API_URL: http://localhost:5001
       REACT_APP_AI_SERVICE_URL: http://localhost:8000
     volumes:
       - ./frontend/src:/app/src
