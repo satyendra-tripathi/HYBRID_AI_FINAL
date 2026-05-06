@@ -1,20 +1,24 @@
-import express from 'express';
-import analyzeController from '../controllers/analyzeController.js';
-import { checkApiKey } from '../middleware/apiKeyMiddleware.js';
+import express from "express";
+import { saveTab, saveTabsBatch } from "../controllers/tabController.js";
+import { checkApiKey } from "../middleware/apiKeyMiddleware.js";
 
 const router = express.Router();
-const apiKeyMiddleware = process.env.API_KEY ? checkApiKey : (req, res, next) => next();
+
+// Optional API key protection
+const apiKeyMiddleware = process.env.API_KEY
+  ? checkApiKey
+  : (req, res, next) => next();
 
 /**
- * POST /api/tab
- * Sync a single tab
+ * @route   POST /api/tab
+ * @desc    Save single browser tab
  */
-router.post('/', apiKeyMiddleware, analyzeController.tabSync);
+router.post("/", apiKeyMiddleware, saveTab);
 
 /**
- * POST /api/tab/batch
- * Sync multiple tabs at once
+ * @route   POST /api/tab/batch
+ * @desc    Save multiple browser tabs
  */
-router.post('/batch', apiKeyMiddleware, analyzeController.tabSyncBatch);
+router.post("/batch", apiKeyMiddleware, saveTabsBatch);
 
 export default router;

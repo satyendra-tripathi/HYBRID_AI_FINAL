@@ -221,7 +221,10 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import morgan from "morgan";
 
+// DB
 import connectDB from "./config/database.js";
+
+// Security
 import {
   helmetConfig,
   corsConfig,
@@ -230,15 +233,18 @@ import {
   createRateLimiter,
 } from "./config/security.js";
 
+// Middleware
 import {
   notFoundHandler,
   errorHandler,
   asyncHandler,
 } from "./middleware/errorHandler.js";
 
+// Utils
 import { logHttpRequest } from "./utils/logger.js";
 import logger from "./utils/logger.js";
 
+// Routes
 import authRoutes from "./routes/auth.js";
 import analyzeRoutes from "./routes/analyze.js";
 import logsRoutes from "./routes/logs.js";
@@ -247,100 +253,91 @@ import tabRoutes from "./routes/tabRoutes.js";
 
 const app = express();
 const httpServer = createServer(app);
+
 const PORT = process.env.PORT || 5001;
 
 /* =========================
-   Render / Proxy Support
+   Proxy Support
 ========================= */
 app.set("trust proxy", 1);
 
 /* =========================
-   Socket.IO
+   Socket.IO Setup
 ========================= */
 const io = new Server(httpServer, {
-  cors: corsOptions,
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 app.set("io", io);
 
 /* =========================
-   Security + CORS
+   Security Middleware
 ========================= */
 app.use(helmetConfig);
-app.use(corsConfig);
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-
-/* =========================
-   Root / Health
-========================= */
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "AI-IDS API is running 🚀",
-  });
-});
-
-app.get(
-  "/health",
-  asyncHandler(async (req, res) => {
-    const db =
-      typeof connectDB.checkDBHealth === "function"
-        ? await connectDB.checkDBHealth()
-        : { status: "unknown" };
-
-    res.status(200).json({
-      success: true,
-      message: "Server is healthy",
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || "development",
-      database: db,
-    });
+// IMPORTANT: Allow extension + frontend
+app.use(
+  corsConfig || ((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "*");
+    next();
   })
 );
 
 /* =========================
-   Logging + Rate Limit
+   Body Parser
+========================= */
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+/* =========================
+   Logging
 ========================= */
 app.use(
-  morgan("combined", {
+  morgan("dev", {
     skip: (req) => req.path === "/health",
   })
 );
 
 app.use(logHttpRequest);
 
-const limiter = createRateLimiter(15 * 60 * 1000, 100);
+/* =========================
+   Rate Limiting
+========================= */
+const limiter = createRateLimiter(15 * 60 * 1000, 200);
 app.use(limiter);
 
 /* =========================
-   Socket Events
+   Root Routes
 ========================= */
-io.on("connection", (socket) => {
-  logger.info(`🔌 Client connected: ${socket.id}`);
-
-  socket.on("join", (room) => {
-    if (!room) return;
-
-    socket.join(room);
-    logger.info(`👤 Client ${socket.id} joined room: ${room}`);
-  });
-
-  socket.on("disconnect", () => {
-    logger.info(`🔌 Client disconnected: ${socket.id}`);
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "🚀 AI-IDS API Running",
   });
 });
 
+app.get(
+  "/health",
+  asyncHandler(async (req, res) => {
+    res.json({
+      success: true,
+      status: "OK",
+      time: new Date().toISOString(),
+    });
+  })
+);
+
 /* =========================
-   API Info
+   API INFO
 ========================= */
 app.get("/api/info", (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    name: "AI Intrusion Detection System",
     version: "1.0.0",
-    description: "Production-ready hybrid AI IDS with K-Means and LSTM",
     endpoints: {
       auth: "/api/auth",
       analyze: "/api/analyze",
@@ -352,22 +349,41 @@ app.get("/api/info", (req, res) => {
 });
 
 /* =========================
-   API Routes
+   ROUTES
 ========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/analyze", analyzeRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/metrics", metricsRoutes);
+
+// 🔥 IMPORTANT (Tab route - DO NOT MODIFY AGAIN)
 app.use("/api/tab", tabRoutes);
 
 /* =========================
-   Error Handlers
+   SOCKET EVENTS
+========================= */
+io.on("connection", (socket) => {
+  logger.info(`🔌 Client connected: ${socket.id}`);
+
+  socket.on("join", (room) => {
+    if (!room) return;
+    socket.join(room);
+    logger.info(`👤 Joined room: ${room}`);
+  });
+
+  socket.on("disconnect", () => {
+    logger.info(`❌ Disconnected: ${socket.id}`);
+  });
+});
+
+/* =========================
+   ERROR HANDLING
 ========================= */
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 /* =========================
-   Start Server
+   START SERVER
 ========================= */
 const startServer = async () => {
   try {
@@ -376,28 +392,33 @@ const startServer = async () => {
     logger.info("✅ Database connected");
 
     httpServer.listen(PORT, () => {
-      logger.info(`✅ Server running on port ${PORT}`);
-      logger.info(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`🌐 Allowed origins: ${allowedOrigins.join(", ")}`);
+      logger.info(`🚀 Server running on port ${PORT}`);
+      logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      logger.info(`🌐 Allowed origins: ${allowedOrigins?.join(", ")}`);
     });
-  } catch (error) {
-    logger.error(`❌ Failed to start server: ${error.message}`);
+  } catch (err) {
+    logger.error("❌ Server start failed:", err.message);
     process.exit(1);
   }
 };
 
-const gracefulShutdown = (signal) => {
-  logger.info(`${signal} received, shutting down gracefully...`);
-
+/* =========================
+   GRACEFUL SHUTDOWN
+========================= */
+const shutdown = (signal) => {
+  logger.info(`${signal} received. Closing server...`);
   httpServer.close(() => {
-    logger.info("Server closed");
+    logger.info("✅ Server closed");
     process.exit(0);
   });
 };
 
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
+/* =========================
+   INIT
+========================= */
 startServer();
 
 export { app, io };
