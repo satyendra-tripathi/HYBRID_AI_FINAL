@@ -57,8 +57,10 @@ export const Dashboard = () => {
     fetchData(true);
 
     const socket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      forceNew: true,
+      path: '/socket.io',
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 5,
+      timeout: 20000,
     });
 
     socket.on('connect', () => {
