@@ -88,6 +88,7 @@ export const Login = ({ onLogin }) => {
               <input
                 type="email"
                 name="email"
+                autoComplete="username"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="your@email.com"
@@ -104,6 +105,7 @@ export const Login = ({ onLogin }) => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
+                autoComplete="current-password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"

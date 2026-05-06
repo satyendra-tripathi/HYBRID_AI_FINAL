@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { FiAlertCircle, FiCheckCircle, FiTrendingUp, FiPackage, FiActivity, FiTarget, FiZap, FiRefreshCcw } from 'react-icons/fi';
 import { analyzeAPI, logsAPI, metricsAPI } from '../utils/api.js';
 import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
-// import { io } from 'socket.io-client';
 
 const SOCKET_URL =
-  import.meta.env.VITE_APP_AI_SERVICE_URL ||
-  import.meta.env.VITE_AI_SERVICE_URL ||
   import.meta.env.VITE_APP_API_URL ||
   import.meta.env.VITE_API_URL ||
-  'http://localhost:8000';
+  'https://backend-service-ot4f.onrender.com';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -58,31 +56,38 @@ export const Dashboard = () => {
   useEffect(() => {
     fetchData(true);
 
-    const socketUrl = SOCKET_URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/ws';
-    const socket = new WebSocket(socketUrl);
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      forceNew: true,
+    });
 
-    socket.onopen = () => {
-      console.log('✅ Connected to AI WebSocket', socketUrl);
-    };
+    socket.on('connect', () => {
+      console.log('✅ Connected to backend Socket.IO', SOCKET_URL);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user && user._id) {
+        socket.emit('join', user._id);
+      }
+    });
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
+    socket.on('new_log', (data) => {
       console.log('🔥 Live Data:', data);
-
       setLatestAnomaly(data);
       setRecentAlerts((prev) => [data, ...prev.slice(0, 4)]);
-    };
+    });
 
-    socket.onerror = (err) => {
-      console.error('❌ WebSocket error', err);
-    };
+    socket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+    });
 
-    socket.onclose = () => {
-      console.log('❌ WebSocket closed');
-    };
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket connection error:', err);
+    });
 
-    return () => socket.close();
+    setSocket(socket);
+
+    return () => {
+      socket.disconnect();
+    };
   }, [daysFilter]);
 
   if (loading) {
