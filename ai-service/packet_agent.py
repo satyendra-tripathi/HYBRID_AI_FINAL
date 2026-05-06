@@ -9,7 +9,7 @@ import time
 import socket
 import threading
 
-API_URL = "https://hybrid-ai-final-1.onrender.com/api/analyze"
+API_URL = "http://localhost:5000/api/analyze"
 API_KEY = "6c8a35703066cf5c88efc28f1ef4fbf0091a48229bb0f68575558322136be4b4"
 
 headers = {

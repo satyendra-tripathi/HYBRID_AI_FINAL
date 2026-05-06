@@ -2,13 +2,22 @@
   "manifest_version": 3,
   "name": "AI-IDS Tab Tracker",
   "version": "1.0",
-  "description": "Tracks active tab info for AI-IDS security analysis.",
-  "permissions": ["tabs", "activeTab", "alarms"],
+  "description": "Tracks active browser tabs and syncs them to the AI-IDS backend in real time.",
+  "permissions": ["tabs", "alarms", "storage"],
   "background": {
     "service_worker": "background.js"
   },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI-IDS Tab Sync"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "host_permissions": [
     "http://localhost:5000/*",
-    "http://127.0.0.1:5000/*",    "https://hybrid-ai-final-1.onrender.com/*",    "https://hybrid-ai-final-1.onrender.com/*"
+    "http://127.0.0.1:5000/*",
+    "https://hybrid-ai-final-1.onrender.com/*"
   ]
 }

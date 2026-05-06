@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-IDS Tab Sync Settings</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      max-width: 520px;
+      margin: 0 auto;
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 18px;
+      padding: 24px;
+    }
+    label {
+      display: block;
+      margin-bottom: 12px;
+      color: #cbd5e1;
+    }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin-top: 6px;
+    }
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 12px;
+      background: #06b6d4;
+      color: #0f172a;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .note {
+      margin-top: 16px;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>AI-IDS Tab Sync Settings</h1>
+    <label>
+      Backend API URL
+      <input id="apiBase" type="url" placeholder="http://localhost:5000/api/tab" />
+    </label>
+    <label>
+      API Key (optional)
+      <input id="apiKey" type="text" placeholder="Enter your X-API-KEY" />
+    </label>
+    <button id="saveButton">Save settings</button>
+    <p class="note">Use local backend URL during development. If your backend requires an API key, provide it here.</p>
+    <p class="note">This extension sends tab metadata to the AI-IDS backend and keeps active tab state in sync.</p>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

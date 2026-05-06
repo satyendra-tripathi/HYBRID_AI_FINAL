@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-IDS Tab Sync</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-width: 300px;
+    }
+    .container {
+      padding: 16px;
+    }
+    h1 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+    .status {
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .status strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #cbd5e1;
+    }
+    .button {
+      width: 100%;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      background: #06b6d4;
+      color: #0f172a;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .button:hover {
+      background: #22d3ee;
+    }
+    .small {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI-IDS Tab Sync</h1>
+    <div class="status" id="status-card">
+      <strong>Status</strong>
+      <div id="status-text">Loading…</div>
+      <div class="small" id="last-sync-text"></div>
+    </div>
+    <button class="button" id="sync-button">Sync tabs now</button>
+    <p class="small">Backend URL: <span id="backend-url"></span></p>
+    <p class="small">API key: <span id="api-key-mask"></span></p>
+    <p class="small">
+      <a id="open-options" href="#">Open settings</a>
+    </p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

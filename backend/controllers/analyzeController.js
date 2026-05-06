@@ -205,11 +205,14 @@ export const tabSyncBatch = asyncHandler(async (req, res) => {
 
 
 const callAIService = async (features) => {
-  logger.info(`[DEBUG] Calling AI Service at: ${process.env.AI_SERVICE_URL}/predict`);
+  const aiServiceBaseUrl = (process.env.AI_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '');
+  const predictUrl = `${aiServiceBaseUrl}/predict`;
+
+  logger.info(`[DEBUG] Calling AI Service at: ${predictUrl}`);
 
   try {
     const response = await axios.post(
-      `${process.env.AI_SERVICE_URL}/predict`,
+      predictUrl,
       { features },
       {
         timeout: Number(process.env.AI_SERVICE_TIMEOUT) || 30000,

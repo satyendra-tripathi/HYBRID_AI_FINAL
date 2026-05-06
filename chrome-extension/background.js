@@ -1,12 +1,10 @@
 // chrome-extension/background.js
 
-// Backend URLs
-const API_BASE = "https://hybrid-ai-final-1.onrender.com/api/tab";
-const SYNC_INTERVAL_MINUTES = 1;
+const DEFAULT_API_BASE = "http://localhost:5000/api/tab";
+const DEFAULT_SYNC_INTERVAL_MINUTES = 1;
 
-/**
- * Format tab object for the backend
- */
+let pendingSync = null;
+
 function formatTab(tab) {
   if (!tab?.url || !tab.url.startsWith("http")) return null;
   try {
@@ -17,75 +15,122 @@ function formatTab(tab) {
       url: tab.url,
       tabId: tab.id,
       windowId: tab.windowId,
-      active: tab.active || false,
-      lastSeenAt: new Date().toISOString()
+      active: Boolean(tab.active),
+      lastSeenAt: new Date().toISOString(),
     };
   } catch (e) {
     return null;
   }
 }
 
-/**
- * Send a single tab update
- */
-async function sendTab(tab) {
+function getStoredConfig() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(
+      {
+        apiBase: DEFAULT_API_BASE,
+        apiKey: "",
+      },
+      (result) => {
+        resolve({
+          apiBase: result.apiBase || DEFAULT_API_BASE,
+          apiKey: result.apiKey || "",
+        });
+      }
+    );
+  });
+}
+
+async function saveSyncStatus(status, message, count = 0) {
+  chrome.storage.local.set({
+    lastSyncAt: new Date().toISOString(),
+    lastSyncStatus: status,
+    lastSyncMessage: message,
+    lastSyncCount: count,
+  });
+}
+
+async function requestHeaders(apiKey) {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return headers;
+}
+
+async function sendTab(tab, apiBase, apiKey) {
   const payload = formatTab(tab);
   if (!payload) return;
 
   try {
-    const res = await fetch(API_BASE, {
+    const res = await fetch(apiBase, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await requestHeaders(apiKey),
       body: JSON.stringify(payload),
     });
+
     if (res.ok) {
       console.log("✅ Tab synced:", payload.domain);
+    } else {
+      console.error("❌ Tab sync failed:", res.status, await res.text());
     }
   } catch (err) {
     console.error("❌ Tab sync error:", err);
   }
 }
 
-/**
- * Sync all open tabs using the batch endpoint
- * This is preferred as it ensures the backend has the correct 'active' state for all tabs.
- */
 async function syncAllTabs() {
+  const { apiBase, apiKey } = await getStoredConfig();
+
   try {
     const tabs = await chrome.tabs.query({});
     const formattedTabs = tabs.map(formatTab).filter(Boolean);
 
-    if (formattedTabs.length === 0) return;
+    if (formattedTabs.length === 0) {
+      await saveSyncStatus("success", "No syncable tabs found", 0);
+      return;
+    }
 
-    const res = await fetch(`${API_BASE}/batch`, {
+    const response = await fetch(`${apiBase}/batch`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await requestHeaders(apiKey),
       body: JSON.stringify({ tabs: formattedTabs }),
     });
 
-    if (res.ok) {
+    if (response.ok) {
       console.log(`✅ Batch synced ${formattedTabs.length} tabs`);
+      await saveSyncStatus("success", `Batch synced ${formattedTabs.length} tabs`, formattedTabs.length);
     } else {
-      console.error("❌ Batch sync failed:", res.status);
+      const text = await response.text();
+      console.error("❌ Batch sync failed:", response.status, text);
+      await saveSyncStatus("error", `Batch sync failed: ${response.status}`, formattedTabs.length);
     }
   } catch (err) {
     console.error("❌ syncAllTabs error:", err);
+    await saveSyncStatus("error", err.message || "Unknown error", 0);
   }
 }
 
-// ----------------------------------------------------------------------------
-// EVENT LISTENERS
-// ----------------------------------------------------------------------------
+function scheduleSync(delay = 500) {
+  if (pendingSync) {
+    clearTimeout(pendingSync);
+  }
+  pendingSync = setTimeout(() => {
+    pendingSync = null;
+    syncAllTabs();
+  }, delay);
+}
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   console.log("🚀 Extension Installed");
-  syncAllTabs();
-  chrome.alarms.create("sync_tabs", { periodInMinutes: SYNC_INTERVAL_MINUTES });
+  await syncAllTabs();
+  chrome.alarms.create("sync_tabs", { periodInMinutes: DEFAULT_SYNC_INTERVAL_MINUTES });
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   console.log("💻 Browser Startup");
-  syncAllTabs();
+  await syncAllTabs();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -94,31 +139,38 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// When a new tab is created
 chrome.tabs.onCreated.addListener(() => {
-  // Use batch sync to ensure all states are consistent
-  setTimeout(syncAllTabs, 2000);
+  scheduleSync();
 });
 
-// When a tab is updated
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || changeInfo.status === "complete" || changeInfo.title) {
-    // If it's a major change, sync all to ensure 'active' and other flags are correct
-    syncAllTabs();
+    scheduleSync();
   }
 });
 
-// When active tab changes - CRITICAL for correct mapping
 chrome.tabs.onActivated.addListener(() => {
-  console.log("🔄 Tab activated - triggering full sync");
-  syncAllTabs();
+  console.log("🔄 Tab activated - scheduling full sync");
+  scheduleSync();
 });
 
-// When a tab is removed
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+    scheduleSync();
+  }
+});
+
 chrome.tabs.onRemoved.addListener(() => {
-  console.log("🗑️ Tab closed - triggering full sync");
-  syncAllTabs();
+  scheduleSync();
 });
 
-// Initial run
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "sync_tabs") {
+    syncAllTabs()
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error?.message }));
+    return true;
+  }
+});
+
 syncAllTabs();
