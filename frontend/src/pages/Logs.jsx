@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import { FiSearch, FiDownload, FiFilter, FiSlash, FiShield, FiCpu, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import { logsAPI } from '../utils/api.js';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_APP_API_URL || 'https://hybrid-ai-final-1.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://hybrid-ai-final-1.onrender.com';
 
 export const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -16,7 +16,10 @@ export const Logs = () => {
     severity: 'All',
     search: '',
   });
-  const [socket, setSocket] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [pendingLogs, setPendingLogs] = useState(0);
+  const socketRef = useRef(null);
+  const paginationRef = useRef(pagination);
   
   // Kill Modal State
   const [killModal, setKillModal] = useState({ open: false, log: null });
@@ -47,18 +50,39 @@ export const Logs = () => {
   }, [filters, pagination.page]);
 
   useEffect(() => {
-    // Initialize Socket
-    const newSocket = io(SOCKET_URL);
-    setSocket(newSocket);
+    paginationRef.current = pagination;
+  }, [pagination]);
 
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (user && user._id) {
-      newSocket.emit('join', user._id);
-    }
+  useEffect(() => {
+    // Initialize Socket
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    socketRef.current = newSocket;
+
+    newSocket.on('connect', () => {
+      setSocketConnected(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user && user._id) {
+        newSocket.emit('join', user._id);
+      }
+    });
+
+    newSocket.on('disconnect', () => {
+      setSocketConnected(false);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      setSocketConnected(false);
+    });
 
     newSocket.on('new_log', (newLog) => {
-      if (pagination.page === 1) {
-        setLogs(prev => [newLog, ...prev.slice(0, pagination.limit - 1)]);
+      if (paginationRef.current.page === 1) {
+        setLogs(prev => [newLog, ...prev.slice(0, paginationRef.current.limit - 1)]);
+      } else {
+        setPendingLogs((count) => count + 1);
       }
     });
 
@@ -66,8 +90,12 @@ export const Logs = () => {
       setLogs(prev => prev.map(log => log._id === updatedLog._id ? updatedLog : log));
     });
 
-    return () => newSocket.disconnect();
-  }, [pagination.page]);
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, []);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -119,20 +147,38 @@ export const Logs = () => {
             <h1 className="text-4xl font-bold text-white">Traffic Logs</h1>
             <p className="text-slate-400">Analyze and manage detected traffic</p>
           </div>
-          <button
-            onClick={() => logsAPI.exportLogsCSV().then(res => {
-              const url = window.URL.createObjectURL(new Blob([res.data]));
-              const link = document.createElement('a');
-              link.href = url;
-              link.setAttribute('download', 'traffic-logs.csv');
-              document.body.appendChild(link);
-              link.click();
-              link.parentElement.removeChild(link);
-            })}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-all shadow-lg"
-          >
-            <FiDownload className="w-5 h-5" /> Export CSV
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => logsAPI.exportLogsCSV().then(res => {
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'traffic-logs.csv');
+                document.body.appendChild(link);
+                link.click();
+                link.parentElement.removeChild(link);
+              })}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition-all shadow-lg"
+            >
+              <FiDownload className="w-5 h-5" /> Export CSV
+            </button>
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${socketConnected ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
+                {socketConnected ? 'Live logs enabled' : 'Live logs disconnected'}
+              </span>
+              {pendingLogs > 0 && (
+                <button
+                  onClick={() => {
+                    fetchLogs();
+                    setPendingLogs(0);
+                  }}
+                  className="inline-flex items-center rounded-full bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600 transition-all"
+                >
+                  {pendingLogs} new log{pendingLogs > 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
