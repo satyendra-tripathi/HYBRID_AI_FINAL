@@ -102,27 +102,39 @@ npm install
 
 ### Step 2: Environment Setup
 
-Create `.env` files:
+Create `.env` files for local development, then copy them to production values when ready.
 
 **backend/.env**
 ```
 PORT=5001
-MONGODB_URI=mongodb://localhost:27017/ai-ids
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-AI_SERVICE_URL=http://localhost:8000
 NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/ai-ids
+JWT_SECRET=your-dev-jwt-secret
+JWT_EXPIRATION=7d
+API_KEY=dev-api-key
+AI_SERVICE_URL=http://localhost:8000
+AI_SERVICE_TIMEOUT=30000
+FIREWALL_MODE=simulation
+FRONTEND_URL=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
 ```
 
 **ai-service/.env**
 ```
-FASTAPI_PORT=8000
-FASTAPI_HOST=0.0.0.0
+PORT=8000
+HOST=0.0.0.0
+ENV=development
 ```
 
 **frontend/.env**
 ```
-REACT_APP_API_URL=http://localhost:5001
+VITE_API_URL=http://localhost:5001
+VITE_SOCKET_URL=http://localhost:5001
+VITE_APP_AI_SERVICE_URL=http://localhost:8000
+VITE_APP_ENV=development
 ```
+
+If you want separate production configuration, copy the example files and replace local URLs with your hosted backend/API URLs, then set `NODE_ENV=production` in backend and `VITE_APP_ENV=production` in the frontend.
 
 ### Step 3: Train AI Models
 

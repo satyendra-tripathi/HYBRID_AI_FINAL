@@ -93,7 +93,7 @@ import axios from "axios";
 const API_URL =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_APP_API_URL ||
-  "https://backend-service-ot4f.onrender.com";
+  "http://localhost:5001";
 
 const api = axios.create({
   baseURL: API_URL.replace(/\/$/, ""),

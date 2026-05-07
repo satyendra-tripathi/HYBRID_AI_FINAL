@@ -4,7 +4,7 @@ import { FiSearch, FiDownload, FiFilter, FiSlash, FiShield, FiCpu, FiCheckCircle
 import { logsAPI } from '../utils/api.js';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'http://localhost:5001';
 
 export const Logs = () => {
   const [logs, setLogs] = useState([]);

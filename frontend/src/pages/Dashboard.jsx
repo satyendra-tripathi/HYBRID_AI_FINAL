@@ -5,7 +5,7 @@ import { analyzeAPI, logsAPI, metricsAPI } from '../utils/api.js';
 import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'http://localhost:5001';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
