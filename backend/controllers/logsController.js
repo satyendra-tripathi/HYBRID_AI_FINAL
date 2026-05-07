@@ -189,8 +189,14 @@ export const updateLogStatus = asyncHandler(async (req, res) => {
   // Emit real-time update
   const io = req.app.get('io');
   if (io) {
-    io.to(userId.toString()).emit('log_updated', log);
+      const userIdStr = userId.toString();
+      logger.info(`📡 Emitting log_updated to room: ${userIdStr}`);
+      logger.info(`📡 Socket rooms:`, io.sockets.adapter.rooms);
+      io.to(userIdStr).emit('log_updated', log);
+      logger.info(`📡 Emitted log_updated event to room ${userIdStr}`);
     io.to(userId.toString()).emit('metrics_updated');
+  } else {
+    logger.warn('⚠️ Socket.io not available for emitting log_updated');
   }
 
   logger.info(`Log status updated for user ${userId}: ${id} -> ${status}`);
@@ -270,8 +276,11 @@ export const killLogAttack = asyncHandler(async (req, res) => {
   // 5. Emit real-time update
   const io = req.app.get('io');
   if (io) {
+    logger.info(`📡 Emitting log_updated (kill) to room: ${userId.toString()}`);
     io.to(userId.toString()).emit('log_updated', log);
     io.to(userId.toString()).emit('metrics_updated');
+  } else {
+    logger.warn('⚠️ Socket.io not available for emitting log_updated (kill)');
   }
 
   logger.info(`Kill attack triggered for IP ${srcIp} by user ${userId}`);

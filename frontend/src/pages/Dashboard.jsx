@@ -54,8 +54,7 @@ export const Dashboard = () => {
     fetchData(true);
 
     const socket = io(SOCKET_URL, {
-      path: '/socket.io',
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       timeout: 20000,
     });
@@ -64,8 +63,9 @@ export const Dashboard = () => {
       console.log('✅ Connected to backend Socket.IO', SOCKET_URL);
       const user = JSON.parse(localStorage.getItem('user'));
       if (user && user._id) {
-        console.log('📥 Joining socket room', user._id);
-        socket.emit('join', user._id);
+        const userId = user._id.toString();
+        console.log('📥 Joining socket room', userId);
+        socket.emit('join', userId);
       } else {
         console.warn('⚠️ Socket join skipped: no user ID found in localStorage');
       }

@@ -20,6 +20,21 @@ export const Logs = () => {
   const [pendingLogs, setPendingLogs] = useState(0);
   const socketRef = useRef(null);
   const paginationRef = useRef(pagination);
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    console.log('🔐 Auth check - Token:', !!token, 'User:', !!user);
+    if (user) {
+      try {
+        const userData = JSON.parse(user);
+        console.log('👤 User data:', userData);
+      } catch (e) {
+        console.error('❌ Invalid user data in localStorage');
+      }
+    }
+  }, []);
   
   // Kill Modal State
   const [killModal, setKillModal] = useState({ open: false, log: null });
@@ -27,6 +42,12 @@ export const Logs = () => {
   const fetchLogs = async () => {
     try {
       setLoading(true);
+      console.log('📡 Fetching logs with params:', {
+        page: pagination.page,
+        limit: pagination.limit,
+        attackType: filters.attackType,
+        severity: filters.severity
+      });
       const response = await logsAPI.getLogs(
         pagination.page,
         pagination.limit,
@@ -34,12 +55,17 @@ export const Logs = () => {
         filters.severity
       );
 
+      console.log('📨 Logs response:', response.data);
+      console.log('📊 Pagination data:', response.data.data.pagination);
+      console.log('📋 Logs array:', response.data.data.logs);
       setLogs(response.data.data.logs);
       setPagination(response.data.data.pagination);
+      console.log('✅ Logs loaded:', response.data.data.logs.length, 'items');
     } catch (error) {
       toast.error('Failed to fetch logs');
       setError('Failed to fetch logs');
-      console.error(error);
+      console.error('❌ Error fetching logs:', error);
+      console.error('Error response:', error.response);
     } finally {
       setLoading(false);
     }
@@ -56,21 +82,25 @@ export const Logs = () => {
   useEffect(() => {
     // Initialize Socket
     const newSocket = io(SOCKET_URL, {
-      path: '/socket.io',
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       timeout: 20000,
     });
     socketRef.current = newSocket;
 
     newSocket.on('connect', () => {
+      console.log('✅ Socket connected successfully to:', SOCKET_URL);
       setSocketConnected(true);
       const user = JSON.parse(localStorage.getItem('user'));
+      console.log('👤 Current user from localStorage:', user);
       if (user && user._id) {
-        console.log('📥 Joining socket room', user._id);
-        newSocket.emit('join', user._id);
+        const userId = user._id.toString();
+        console.log('📥 Joining socket room', userId, 'type:', typeof userId);
+        newSocket.emit('join', userId);
+        console.log('📤 Join event emitted');
       } else {
         console.warn('⚠️ Socket join skipped: no user ID found in localStorage');
+        console.log('localStorage user:', localStorage.getItem('user'));
       }
     });
 
@@ -84,6 +114,7 @@ export const Logs = () => {
     });
 
     newSocket.on('new_log', (newLog) => {
+      console.log('🔥 Received new_log event:', newLog);
       if (paginationRef.current.page === 1) {
         setLogs(prev => [newLog, ...prev.slice(0, paginationRef.current.limit - 1)]);
       } else {
@@ -92,6 +123,7 @@ export const Logs = () => {
     });
 
     newSocket.on('log_updated', (updatedLog) => {
+      console.log('🔄 Received log_updated event:', updatedLog);
       setLogs(prev => prev.map(log => log._id === updatedLog._id ? updatedLog : log));
     });
 

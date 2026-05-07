@@ -45,6 +45,7 @@ export const authenticate = async (req, res, next) => {
       // Attach user to request
       req.user = user;
       req.token = token;
+      console.log('✅ User authenticated:', { id: user._id, email: user.email });
       next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {

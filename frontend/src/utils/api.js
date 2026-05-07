@@ -106,9 +106,13 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
+    console.log('🔑 API Request:', config.method?.toUpperCase(), config.url, 'Token:', !!token);
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('📤 Authorization header set');
+    } else {
+      console.warn('⚠️ No token found for API request');
     }
 
     return config;
@@ -117,8 +121,13 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('📥 API Response:', response.status, response.config.method?.toUpperCase(), response.config.url);
+    return response;
+  },
   (error) => {
+    console.error('❌ API Error:', error.response?.status, error.config?.method?.toUpperCase(), error.config?.url, error.response?.data || error.message);
+
     const isAuthPage =
       window.location.pathname === "/login" ||
       window.location.pathname === "/register";
