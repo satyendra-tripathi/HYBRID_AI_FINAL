@@ -4,7 +4,7 @@ import { FiSearch, FiDownload, FiFilter, FiSlash, FiShield, FiCpu, FiCheckCircle
 import { logsAPI } from '../utils/api.js';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://hybrid-ai-final-1.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
 
 export const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -56,8 +56,10 @@ export const Logs = () => {
   useEffect(() => {
     // Initialize Socket
     const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      forceNew: true,
+      path: '/socket.io',
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 5,
+      timeout: 20000,
     });
     socketRef.current = newSocket;
 
@@ -65,7 +67,10 @@ export const Logs = () => {
       setSocketConnected(true);
       const user = JSON.parse(localStorage.getItem('user'));
       if (user && user._id) {
+        console.log('📥 Joining socket room', user._id);
         newSocket.emit('join', user._id);
+      } else {
+        console.warn('⚠️ Socket join skipped: no user ID found in localStorage');
       }
     });
 

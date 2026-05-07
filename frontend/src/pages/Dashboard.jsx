@@ -5,10 +5,7 @@ import { analyzeAPI, logsAPI, metricsAPI } from '../utils/api.js';
 import TrafficChart from '../components/TrafficChart.jsx';
 import SeverityTimelineChart from '../components/SeverityTimelineChart.jsx';
 
-const SOCKET_URL =
-  import.meta.env.VITE_APP_API_URL ||
-  import.meta.env.VITE_API_URL ||
-  'https://backend-service-ot4f.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_APP_API_URL || 'https://backend-service-ot4f.onrender.com';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -67,7 +64,10 @@ export const Dashboard = () => {
       console.log('✅ Connected to backend Socket.IO', SOCKET_URL);
       const user = JSON.parse(localStorage.getItem('user'));
       if (user && user._id) {
+        console.log('📥 Joining socket room', user._id);
         socket.emit('join', user._id);
+      } else {
+        console.warn('⚠️ Socket join skipped: no user ID found in localStorage');
       }
     });
 
